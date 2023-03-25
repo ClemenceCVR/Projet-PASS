@@ -1,17 +1,19 @@
+"""Fonction qui calcule le coefficient de Zipf"""
+
 def calcule_coefficient_zipf(nb):
-    # On importe les bibliothèques nécessaires
+    #on importe les bibliothèques nécessaires
     import requests
     from bs4 import BeautifulSoup
     import numpy as np
 
-    # On scrape les informations des villes des États-Unis sur Wikipedia
+    #n scrape les informations des villes des États-Unis sur Wikipedia
     url = "https://en.wikipedia.org/wiki/List_of_metropolitan_statistical_areas"
     reponse = requests.get(url)
     soup = BeautifulSoup(reponse.content, 'html.parser')
     tableau = soup.find_all('table')[1]
     rows = tableau.find_all('tr')[1:]
 
-    # On extrait le nom et la population de chaque zone métropolitaine
+    #on extrait le nom et la population de chaque zone métropolitaine
     zones_metropolitaines = []
     for row in rows:
         cells = row.find_all('td')
@@ -19,18 +21,79 @@ def calcule_coefficient_zipf(nb):
         population = int(cells[2].text.replace(',', ''))
         zones_metropolitaines.append({'nom': nom, 'population': population})
 
-    # On trie les zones métropolitaines par taille de population
+    #on trie les zones métropolitaines par taille de population
     zones_metropolitaines = sorted(zones_metropolitaines, key=lambda x: x['population'], reverse=True)
 
-    # On garde les plus grandes zones métropolitaines
+    #on garde les plus grandes zones métropolitaines
     zones_metropolitaines = zones_metropolitaines[:nb]
 
     # On calcule le logarithme de la taille et du rang de chaque zone métropolitaine
     zones_metropolitaines = [{'nom': zone['nom'], 'log_taille': np.log(zone['population']), 'log_rang': np.log(index + 1)} for index, zone in enumerate(zones_metropolitaines)]
 
-    # On vérifie si les données suivent la loi de Zipf
+    #on vérifie si les données suivent la loi de Zipf
     coefficient_zipf = np.polyfit([zone['log_rang'] for zone in zones_metropolitaines], [zone['log_taille'] for zone in zones_metropolitaines], 1)[0]
     print('Le coefficient de Zipf pour les', nb, f'premières villes des USA est : {coefficient_zipf:.3f}')
     
 calcule_coefficient_zipf(135)
 calcule_coefficient_zipf(235)
+
+"""Fonction qui affiche le graphique et calcule le coefficient de Zipf"""
+
+
+import requests
+from bs4 import BeautifulSoup
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.stats import linregress
+
+def afficher_log_zipf(nb):
+    #on recupère la liste des zones métropolitaines des États-Unis depuis Wikipédia
+    url = "https://en.wikipedia.org/wiki/List_of_metropolitan_statistical_areas"
+    reponse = requests.get(url)
+    soup = BeautifulSoup(reponse.content, 'html.parser')
+    table = soup.find_all('table')[1]
+    lignes = table.find_all('tr')[1:]
+    
+    #on extrait le nom et la population de chaque zone métropolitaine
+    zones_metropolitaines = []
+    for ligne in lignes:
+        cellules = ligne.find_all('td')
+        nom = cellules[0].text.strip()
+        population = int(cellules[2].text.replace(',', ''))
+        zones_metropolitaines.append({'nom': nom, 'population': population})
+    
+    #on trie les zones métropolitaines par taille de population
+    zones_metropolitaines = sorted(zones_metropolitaines, key=lambda x: x['population'], reverse=True)
+    
+    #on prend les plus grandes zones métropolitaines
+    zones_metropolitaines = zones_metropolitaines[:nb]
+    
+    # Calculer le logarithme de la population et du rang de chaque zone métropolitaine
+    log_tailles = [np.log(zone['population']) for zone in zones_metropolitaines]
+    log_rangs = [np.log(index + 1) for index, zone in enumerate(zones_metropolitaines)]
+    
+    #on calcule le coefficient de Zipf
+    pente, ordonnee_origine, r_value, p_value, std_err = linregress(log_tailles, log_rangs)
+    coefficient_zipf = pente
+    
+    #on trace le graphique du logarithme de la population en fonction du logarithme du rang
+    plt.plot(log_tailles, log_rangs, marker='.', linestyle='')
+    
+    #on ajoute des étiquettes d'axe et un titre au graphique
+    plt.xlabel('Log Taille')
+    plt.ylabel('Log Rang')
+    titre=str(nb)+' premières aires métropolitaines des États-Unis classées par taille de population'
+    plt.title(titre)
+    
+    #on calcule la droite de régression linéaire et la valeur R²
+    x = np.array([min(log_tailles), max(log_tailles)])
+    y = pente * x + ordonnee_origine
+    r_carre = r_value ** 2
+    
+    #on ajoute la droite de régression linéaire, la valeur R² et le coefficient de Zipf au graphique
+    plt.plot(x, y, color='turquoise', linewidth=0.7)
+    plt.text(14, 1, f'R²: {r_carre:.2f}\nCoefficient de Zipf: {coefficient_zipf:.2f}')
+    
+    #on affiche le graphique
+    plt.show()
+
